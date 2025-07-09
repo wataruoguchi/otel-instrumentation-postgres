@@ -1,10 +1,9 @@
 import type postgres from "postgres";
+import { PG_CONNECTION_EVENT_NAME, PG_EVENT_NAME } from "./constants.js";
 import { type DbQueryEvent, getDbEventEmitter } from "./db-events.js";
+import type { Logger } from "./logger.js";
 
-type Logger = {
-  debug: (msg: string, ...args: unknown[]) => void;
-  info: (msg: string, ...args: unknown[]) => void;
-};
+const LOG_PREFIX = "[DB-QUERY-SENDER]";
 
 // Type for the postgres client
 export type PostgresClient = ReturnType<typeof postgres>;
@@ -21,28 +20,41 @@ export function createOTELEmitter(
   client: PostgresClient,
   logger?: Logger,
 ): PostgresClient {
-  logger?.info("[DB-QUERY-SENDER] Creating event-emitting postgres client");
+  logger?.info?.(`${LOG_PREFIX} Creating event-emitting postgres client`);
+
+  // Track connection IDs for disconnect events
+  const connectionIds = new Map<unknown, string>();
 
   // Proxy to intercept reserved connections and direct calls
   const handler: ProxyHandler<PostgresClient> = {
     get(target, prop, receiver) {
-      logger?.debug(
-        "[DB-QUERY-SENDER] Proxy get called for prop:",
-        String(prop),
-      );
+      logger?.debug?.(`${LOG_PREFIX} Proxy get called for prop:`, String(prop));
       const value = Reflect.get(target, prop, receiver);
       if (prop === "reserve" && typeof value === "function") {
-        logger?.debug("[DB-QUERY-SENDER] Intercepting reserve method");
+        logger?.debug?.(`${LOG_PREFIX} Intercepting reserve method`);
         return async function (this: unknown, ...args: unknown[]) {
-          logger?.debug("[DB-QUERY-SENDER] Reserve method called");
+          logger?.debug?.(`${LOG_PREFIX} Reserve method called`);
           const reserved = await value.apply(this, args);
-          return createEventEmittingReservedConnection(reserved, logger);
+
+          // Generate connection ID
+          const connectionId = Math.random().toString(36).substring(2, 15);
+          connectionIds.set(reserved, connectionId);
+
+          // Emit connection event when a connection is reserved
+          logger?.debug?.(`${LOG_PREFIX} Emitting connection event`);
+          getDbEventEmitter(logger).emit(PG_CONNECTION_EVENT_NAME, {
+            type: "connect",
+            timestamp: Date.now(),
+            connectionId,
+          });
+
+          return createEventEmittingReservedConnection(reserved, connectionId);
         };
       }
       if (typeof value === "function") {
-        logger?.debug("[DB-QUERY-SENDER] Intercepting function:", String(prop));
+        logger?.debug?.(`${LOG_PREFIX} Intercepting function:`, String(prop));
         return function (this: unknown, ...args: unknown[]) {
-          logger?.debug("[DB-QUERY-SENDER] Function called:", String(prop));
+          logger?.debug?.(`${LOG_PREFIX} Function called:`, String(prop));
 
           // Check if this looks like a query method
           if (
@@ -50,8 +62,8 @@ export function createOTELEmitter(
             typeof args[0] === "string" &&
             /^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)/i.test(args[0])
           ) {
-            logger?.debug("[DB-QUERY-SENDER] SQL detected in function call!");
-            return emitAndRunQuery(value, this, args, logger);
+            logger?.debug?.(`${LOG_PREFIX} SQL detected in function call!`);
+            return emitAndRunQuery(value, this, args);
           }
 
           return value.apply(this, args);
@@ -60,30 +72,30 @@ export function createOTELEmitter(
       return value;
     },
     apply(target, thisArg, argArray) {
-      logger?.debug("[DB-QUERY-SENDER] Proxy apply called");
-      return emitAndRunQuery(target, thisArg, argArray, logger);
+      logger?.debug?.(`${LOG_PREFIX} Proxy apply called`);
+      return emitAndRunQuery(target, thisArg, argArray);
     },
   };
 
   function createEventEmittingReservedConnection(
     reserved: unknown,
-    logger?: Logger,
+    connectionId: string,
   ) {
-    logger?.debug(
-      "[DB-QUERY-SENDER] Creating event-emitting reserved connection",
+    logger?.debug?.(
+      `${LOG_PREFIX} Creating event-emitting reserved connection`,
     );
 
     // If it's a function, check if it has properties (like release)
     if (typeof reserved === "function") {
-      logger?.debug(
-        "[DB-QUERY-SENDER] Reserved is a function, checking for properties",
+      logger?.debug?.(
+        `${LOG_PREFIX} Reserved is a function, checking for properties`,
       );
       const reservedFunc = reserved as ReservedFunction;
 
       // Check if the function has a release property
       if (reservedFunc.release) {
-        logger?.debug(
-          "[DB-QUERY-SENDER] Function has release property, treating as object with methods",
+        logger?.debug?.(
+          `${LOG_PREFIX} Function has release property, treating as object with methods`,
         );
 
         // Create a proxy that wraps the function and its properties
@@ -93,8 +105,8 @@ export function createOTELEmitter(
             thisArg: unknown,
             argArray: unknown[],
           ) {
-            logger?.debug(
-              "[DB-QUERY-SENDER] Reserved function called directly with args:",
+            logger?.debug?.(
+              `${LOG_PREFIX} Reserved function called directly with args:`,
               argArray,
             );
 
@@ -106,10 +118,10 @@ export function createOTELEmitter(
                 argArray[0],
               )
             ) {
-              logger?.debug(
-                "[DB-QUERY-SENDER] SQL detected in direct function call!",
+              logger?.debug?.(
+                `${LOG_PREFIX} SQL detected in direct function call!`,
               );
-              return emitAndRunQuery(target, thisArg, argArray, logger);
+              return emitAndRunQuery(target, thisArg, argArray);
             }
 
             return target.apply(thisArg, argArray);
@@ -124,12 +136,25 @@ export function createOTELEmitter(
 
             if (typeof value === "function") {
               return function (this: unknown, ...args: unknown[]) {
-                logger?.debug(
-                  "[DB-QUERY-SENDER] Reserved function property called:",
+                logger?.debug?.(
+                  `${LOG_PREFIX} Reserved function property called:`,
                   String(prop),
                   "with args:",
                   args,
                 );
+
+                // Handle release method to emit disconnect event
+                if (prop === "release" && connectionId && connectionIds) {
+                  logger?.debug?.(
+                    `${LOG_PREFIX} Release method called, emitting disconnect event`,
+                  );
+                  getDbEventEmitter(logger).emit(PG_CONNECTION_EVENT_NAME, {
+                    type: "disconnect",
+                    timestamp: Date.now(),
+                    connectionId,
+                  });
+                  connectionIds.delete(reserved);
+                }
 
                 // Check if this looks like a query method (not release, etc.)
                 if (
@@ -141,11 +166,11 @@ export function createOTELEmitter(
                     args[0],
                   )
                 ) {
-                  logger?.debug(
-                    "[DB-QUERY-SENDER] SQL detected in property method call for prop:",
+                  logger?.debug?.(
+                    `${LOG_PREFIX} SQL detected in property method call for prop:`,
                     String(prop),
                   );
-                  return emitAndRunQuery(value, this, args, logger);
+                  return emitAndRunQuery(value, this, args);
                 }
 
                 return value.apply(this, args);
@@ -156,13 +181,13 @@ export function createOTELEmitter(
           },
         });
       } else {
-        logger?.debug(
-          "[DB-QUERY-SENDER] Function has no release property, treating as simple function",
+        logger?.debug?.(
+          `${LOG_PREFIX} Function has no release property, treating as simple function`,
         );
         // Simple function wrapper
         return function (this: unknown, ...args: unknown[]) {
-          logger?.debug(
-            "[DB-QUERY-SENDER] Reserved function called with args:",
+          logger?.debug?.(
+            `${LOG_PREFIX} Reserved function called with args:`,
             args,
           );
 
@@ -171,8 +196,8 @@ export function createOTELEmitter(
             typeof args[0] === "string" &&
             /^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)/i.test(args[0])
           ) {
-            logger?.debug("[DB-QUERY-SENDER] SQL detected in function call!");
-            return emitAndRunQuery(reservedFunc, this, args, logger);
+            logger?.debug?.(`${LOG_PREFIX} SQL detected in function call!`);
+            return emitAndRunQuery(reservedFunc, this, args);
           }
 
           return reservedFunc.apply(this, args);
@@ -181,14 +206,14 @@ export function createOTELEmitter(
     }
 
     if (typeof reserved !== "object" || reserved === null) {
-      logger?.debug(
-        "[DB-QUERY-SENDER] Reserved is not an object or function, returning as-is",
+      logger?.debug?.(
+        `${LOG_PREFIX} Reserved is not an object or function, returning as-is`,
       );
       return reserved;
     }
 
-    logger?.debug(
-      "[DB-QUERY-SENDER] Wrapping reserved connection object with proxy",
+    logger?.debug?.(
+      `${LOG_PREFIX} Wrapping reserved connection object with proxy`,
     );
 
     // Return a proxy that wraps the reserved connection object
@@ -199,12 +224,25 @@ export function createOTELEmitter(
         // If it's a function, wrap it to emit events
         if (typeof value === "function") {
           return function (this: unknown, ...args: unknown[]) {
-            logger?.debug(
-              "[DB-QUERY-SENDER] Reserved connection method called:",
+            logger?.debug?.(
+              `${LOG_PREFIX} Reserved connection method called:`,
               String(prop),
               "with args:",
               args,
             );
+
+            // Handle release method to emit disconnect event
+            if (prop === "release" && connectionId && connectionIds) {
+              logger?.debug?.(
+                `${LOG_PREFIX} Release method called, emitting disconnect event`,
+              );
+              getDbEventEmitter(logger).emit(PG_CONNECTION_EVENT_NAME, {
+                type: "disconnect",
+                timestamp: Date.now(),
+                connectionId,
+              });
+              connectionIds.delete(reserved);
+            }
 
             // Check if this looks like a query method (not release, etc.)
             if (
@@ -214,11 +252,11 @@ export function createOTELEmitter(
               typeof args[0] === "string" &&
               /^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)/i.test(args[0])
             ) {
-              logger?.debug(
-                "[DB-QUERY-SENDER] SQL detected in method call for prop:",
+              logger?.debug?.(
+                `${LOG_PREFIX} SQL detected in method call for prop:`,
                 String(prop),
               );
-              return emitAndRunQuery(value, this, args, logger);
+              return emitAndRunQuery(value, this, args);
             }
 
             // For non-query methods (like release), just call the original
@@ -236,14 +274,13 @@ export function createOTELEmitter(
     target: unknown,
     thisArg: unknown,
     argArray: unknown[],
-    logger?: Logger,
   ) {
     const sql = argArray[0] as string;
     const params = (argArray[1] as unknown[]) || [];
     const start = Date.now();
 
-    logger?.debug(
-      "[DB-QUERY-SENDER] Intercepted query:",
+    logger?.debug?.(
+      `${LOG_PREFIX} Intercepted query:`,
       `${sql.substring(0, 100)}...`,
     );
 
@@ -259,11 +296,11 @@ export function createOTELEmitter(
         durationMs: Date.now() - start,
       } as DbQueryEvent;
 
-      logger?.debug(
-        "[DB-QUERY-SENDER] Emitting success event:",
+      logger?.debug?.(
+        `${LOG_PREFIX} Emitting success event:`,
         `${event.durationMs}ms`,
       );
-      getDbEventEmitter(logger).emit("db:query", event);
+      getDbEventEmitter(logger).emit(PG_EVENT_NAME, event);
       return result;
     } catch (error) {
       const event = {
@@ -273,11 +310,11 @@ export function createOTELEmitter(
         durationMs: Date.now() - start,
       } as DbQueryEvent;
 
-      logger?.debug(
-        "[DB-QUERY-SENDER] Emitting error event:",
+      logger?.debug?.(
+        `${LOG_PREFIX} Emitting error event:`,
         `${event.durationMs}ms`,
       );
-      getDbEventEmitter(logger).emit("db:query", event);
+      getDbEventEmitter(logger).emit(PG_EVENT_NAME, event);
       throw error;
     }
   }

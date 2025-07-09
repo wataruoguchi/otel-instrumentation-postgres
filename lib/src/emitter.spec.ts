@@ -227,7 +227,7 @@ describe("emitter", () => {
       );
     });
 
-    it("should not emit events for release method on reserved connections", async () => {
+    it("should emit disconnect event for release method on reserved connections", async () => {
       const mockReservedConnection = {
         query: vi.fn().mockResolvedValue({ rows: [] }),
         release: vi.fn(),
@@ -248,7 +248,14 @@ describe("emitter", () => {
 
       await reserved.release();
 
-      expect(querySpy).not.toHaveBeenCalled();
+      expect(querySpy).toHaveBeenCalledWith(
+        "db:connection",
+        expect.objectContaining({
+          type: "disconnect",
+          timestamp: expect.any(Number),
+          connectionId: expect.any(String),
+        }),
+      );
     });
   });
 

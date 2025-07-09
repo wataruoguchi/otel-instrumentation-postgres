@@ -1,4 +1,9 @@
 import { EventEmitter } from "node:events";
+import { PG_EVENT_NAME } from "./constants.js";
+import type { Logger } from "./logger.js";
+
+// Log prefix constant
+const LOG_PREFIX = "[DB-EVENTS]";
 
 export type DbQueryEvent = {
   sql: string;
@@ -9,21 +14,19 @@ export type DbQueryEvent = {
   context?: unknown; // for future extensibility (e.g., trace context)
 };
 
-export type Logger = {
-  debug: (message: string, ...args: unknown[]) => void;
-};
-
 const GLOBAL_KEY = "__db_event_emitter_singleton__";
 
 export function getDbEventEmitter(logger?: Logger): EventEmitter {
   // Check if we already have an instance in global scope
   if ((global as unknown as Record<string, unknown>)[GLOBAL_KEY]) {
-    logger?.debug("[DB-EVENTS] Using existing event emitter from global scope");
+    logger?.debug?.(
+      `${LOG_PREFIX} Using existing event emitter from global scope`,
+    );
     return (global as unknown as Record<string, unknown>)[
       GLOBAL_KEY
     ] as EventEmitter;
   } else {
-    logger?.debug("[DB-EVENTS] Creating new event emitter singleton");
+    logger?.debug?.(`${LOG_PREFIX} Creating new event emitter singleton`);
     const dbEventEmitter = createDbEventEmitter(logger);
     (global as unknown as Record<string, unknown>)[GLOBAL_KEY] = dbEventEmitter;
     return dbEventEmitter;
@@ -39,19 +42,19 @@ export function createDbEventEmitter(logger?: Logger): EventEmitter {
   // Add debugging for event emission
   const originalEmit = eventEmitter.emit.bind(eventEmitter);
   eventEmitter.emit = (event: string, ...args: unknown[]) => {
-    if (event === "db:query") {
-      logger?.debug(
-        "[DB-EVENTS] Emitting db:query event with",
+    if (event === PG_EVENT_NAME) {
+      logger?.debug?.(
+        `${LOG_PREFIX} Emitting ${PG_EVENT_NAME} event with`,
         args.length,
         "arguments",
       );
-      logger?.debug(
-        "[DB-EVENTS] Event emitter instance ID:",
-        eventEmitter.listenerCount("db:query"),
+      logger?.debug?.(
+        `${LOG_PREFIX} Event emitter instance ID:`,
+        eventEmitter.listenerCount(PG_EVENT_NAME),
       );
-      logger?.debug(
-        "[DB-EVENTS] Current listeners count:",
-        eventEmitter.listenerCount("db:query"),
+      logger?.debug?.(
+        `${LOG_PREFIX} Current listeners count:`,
+        eventEmitter.listenerCount(PG_EVENT_NAME),
       );
     }
     return originalEmit(event, ...args);
@@ -60,27 +63,29 @@ export function createDbEventEmitter(logger?: Logger): EventEmitter {
   // Add debugging for event listeners
   const originalOn = eventEmitter.on.bind(eventEmitter);
   eventEmitter.on = (event: string, listener: (...args: unknown[]) => void) => {
-    if (event === "db:query") {
-      logger?.debug("[DB-EVENTS] Adding listener for db:query event");
-      logger?.debug(
-        "[DB-EVENTS] Listener count before:",
-        eventEmitter.listenerCount("db:query"),
+    if (event === PG_EVENT_NAME) {
+      logger?.debug?.(
+        `${LOG_PREFIX} Adding listener for ${PG_EVENT_NAME} event`,
+      );
+      logger?.debug?.(
+        `${LOG_PREFIX} Listener count before:`,
+        eventEmitter.listenerCount(PG_EVENT_NAME),
       );
     }
     const result = originalOn(event, listener);
-    if (event === "db:query") {
-      logger?.debug(
-        "[DB-EVENTS] Listener count after:",
-        eventEmitter.listenerCount("db:query"),
+    if (event === PG_EVENT_NAME) {
+      logger?.debug?.(
+        `${LOG_PREFIX} Listener count after:`,
+        eventEmitter.listenerCount(PG_EVENT_NAME),
       );
     }
     return result;
   };
 
   // Log when the emitter is created
-  logger?.debug(
-    "[DB-EVENTS] Event emitter created, instance ID:",
-    eventEmitter.listenerCount("db:query"),
+  logger?.debug?.(
+    `${LOG_PREFIX} Event emitter created, instance ID:`,
+    eventEmitter.listenerCount(PG_EVENT_NAME),
   );
 
   return eventEmitter;

@@ -12,7 +12,5 @@
     "noEmit": true,
     "outDir": "dist",
     "resolveJsonModule": true,
-
-    "types": ["vitest/globals"]
   }
 }
