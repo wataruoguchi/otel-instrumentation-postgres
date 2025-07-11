@@ -1,8 +1,4 @@
-import {
-  PG_COMPLEXITY_HIGH,
-  PG_COMPLEXITY_LOW,
-  PG_COMPLEXITY_MEDIUM,
-} from "./constants.js";
+import { PG_COMPLEXITY } from "./constants.js";
 
 export function analyzeQuery(sql: string): {
   operation: string;
@@ -12,7 +8,7 @@ export function analyzeQuery(sql: string): {
   hasOrderBy: boolean;
   hasLimit: boolean;
   parameterCount: number;
-  estimatedComplexity: "low" | "medium" | "high";
+  estimatedComplexity: PG_COMPLEXITY;
 } {
   // Remove comments and normalize whitespace
   const cleanSql = sql.replace(/--.*$/gm, "").replace(/\s+/g, " ").trim();
@@ -45,11 +41,11 @@ export function analyzeQuery(sql: string): {
   const parameterCount = (sql.match(/\?/g) || []).length;
 
   // Estimate complexity
-  let estimatedComplexity: "low" | "medium" | "high" = PG_COMPLEXITY_LOW;
+  let estimatedComplexity: PG_COMPLEXITY = PG_COMPLEXITY.LOW;
   if (hasJoin || hasOrderBy || parameterCount > 5)
-    estimatedComplexity = PG_COMPLEXITY_MEDIUM;
+    estimatedComplexity = PG_COMPLEXITY.MEDIUM;
   if (hasJoin && hasOrderBy && hasWhere)
-    estimatedComplexity = PG_COMPLEXITY_HIGH;
+    estimatedComplexity = PG_COMPLEXITY.HIGH;
 
   return {
     operation,

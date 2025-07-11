@@ -7,6 +7,7 @@ export type DbQueryEvent = {
   result?: unknown;
   error?: unknown;
   durationMs: number;
+  databaseName?: string;
   context?: unknown; // for future extensibility (e.g., trace context)
 };
 

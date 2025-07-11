@@ -4,14 +4,21 @@ import {
   type InstrumentationConfig,
   type InstrumentationNodeModuleDefinition,
 } from "@opentelemetry/instrumentation";
-import { DB_SYSTEM_NAME_VALUE_POSTGRESQL } from "@opentelemetry/semantic-conventions";
+import {
+  ATTR_DB_COLLECTION_NAME,
+  ATTR_DB_NAMESPACE,
+  ATTR_DB_OPERATION_NAME,
+  ATTR_DB_QUERY_TEXT,
+  ATTR_DB_SYSTEM_NAME,
+  ATTR_EXCEPTION_TYPE,
+  ATTR_SERVICE_NAME,
+  DB_SYSTEM_NAME_VALUE_POSTGRESQL,
+  METRIC_DB_CLIENT_OPERATION_DURATION,
+} from "@opentelemetry/semantic-conventions";
 import {
   PG_CONNECTION_EVENT_NAME,
   PG_DB_DURATION_MS,
   PG_DB_DURATION_SECONDS,
-  PG_DB_NAME,
-  PG_DB_NAME_POSTGRES,
-  PG_DB_OPERATION,
   PG_DB_PARAMETER_COUNT,
   PG_DB_QUERY_COMPLEXITY,
   PG_DB_QUERY_HAS_JOIN,
@@ -21,35 +28,16 @@ import {
   PG_DB_QUERY_PARAMETER_PREFIX,
   PG_DB_QUERY_TYPE,
   PG_DB_RESULT_ROW_COUNT,
-  PG_DB_RESULT_TYPE,
-  PG_DB_SQL_TABLE,
-  PG_DB_STATEMENT,
-  PG_DB_SYSTEM,
   PG_DEFAULT_HISTOGRAM_BUCKETS,
-  PG_DEFAULT_SERVER_ADDRESS,
-  PG_DEFAULT_SERVER_PORT,
-  PG_ERROR_TYPE,
   PG_EVENT_NAME,
-  PG_METRIC_ATTR_DB_OPERATION,
-  PG_METRIC_ATTR_DB_QUERY_COMPLEXITY,
-  PG_METRIC_ATTR_DB_QUERY_TYPE,
-  PG_METRIC_ATTR_DB_SYSTEM,
-  PG_METRIC_ATTR_DB_TABLE,
   PG_METRIC_ATTR_ERROR_TYPE,
-  PG_METRIC_ATTR_SERVICE_NAME,
   PG_METRIC_CONNECTION_DURATION,
   PG_METRIC_CONNECTIONS,
-  PG_METRIC_DURATION,
   PG_METRIC_ERRORS,
   PG_METRIC_REQUESTS,
-  PG_QUERY_TYPE_READ,
-  PG_QUERY_TYPE_SCHEMA,
-  PG_QUERY_TYPE_UNKNOWN,
-  PG_QUERY_TYPE_WRITE,
+  PG_QUERY_TYPE,
   PG_SERVER_ADDRESS,
   PG_SERVER_PORT,
-  PG_SERVICE_NAME,
-  PG_SPAN_NAME,
   PG_TRACER_NAME,
   PG_TRACER_VERSION,
 } from "./constants.js";
@@ -72,6 +60,7 @@ export interface PostgresInstrumentationConfig extends InstrumentationConfig {
   collectQueryParameters?: boolean;
   serverAddress?: string;
   serverPort?: number;
+  databaseName?: string;
   parameterSanitizer?: ParameterSanitizer;
   beforeSpan?: BeforeSpanHook;
   afterSpan?: AfterSpanHook;
@@ -85,8 +74,9 @@ export class PostgresInstrumentation extends InstrumentationBase {
   private enableHistogram: boolean;
   private histogramBuckets: number[];
   private collectQueryParameters: boolean;
-  private serverAddress: string;
-  private serverPort: number;
+  private serverAddress: string | undefined;
+  private serverPort: number | undefined;
+  private databaseName: string | undefined;
   private parameterSanitizer: ParameterSanitizer;
   private beforeSpan?: BeforeSpanHook;
   private afterSpan?: AfterSpanHook;
@@ -107,10 +97,12 @@ export class PostgresInstrumentation extends InstrumentationBase {
       config.histogramBuckets ?? PG_DEFAULT_HISTOGRAM_BUCKETS;
     this.collectQueryParameters = config.collectQueryParameters ?? false;
     this.serverAddress =
-      config.serverAddress ?? process.env.PGHOST ?? PG_DEFAULT_SERVER_ADDRESS;
+      config.serverAddress ?? process.env.PGHOST ?? undefined;
     this.serverPort =
       config.serverPort ??
-      (Number(process.env.PGPORT) || PG_DEFAULT_SERVER_PORT);
+      (process.env.PGPORT ? Number(process.env.PGPORT) : undefined);
+    this.databaseName =
+      config.databaseName ?? process.env.PGDATABASE ?? undefined;
     this.parameterSanitizer =
       config.parameterSanitizer ?? this.defaultParameterSanitizer;
     this.beforeSpan = config.beforeSpan;
@@ -144,7 +136,7 @@ export class PostgresInstrumentation extends InstrumentationBase {
       if (this.enableHistogram) {
         try {
           this.queryDurationHistogram = this.meter.createHistogram(
-            PG_METRIC_DURATION,
+            METRIC_DB_CLIENT_OPERATION_DURATION,
             {
               description: "Duration of PostgreSQL database queries in seconds",
               unit: "s",
@@ -255,15 +247,20 @@ export class PostgresInstrumentation extends InstrumentationBase {
     );
     const tracer = trace.getTracer(PG_TRACER_NAME, PG_TRACER_VERSION);
     const queryAnalysis = analyzeQuery(event.sql);
+
     const span = tracer.startSpan(
-      PG_SPAN_NAME,
+      queryAnalysis.operation,
       {
         attributes: {
-          [PG_DB_SYSTEM]: DB_SYSTEM_NAME_VALUE_POSTGRESQL,
-          [PG_DB_STATEMENT]: this.sanitizeQuery(event.sql),
-          [PG_DB_OPERATION]: queryAnalysis.operation,
-          [PG_DB_NAME]: PG_DB_NAME_POSTGRES,
-          [PG_DB_SQL_TABLE]: queryAnalysis.table || "",
+          ...(this.serviceName && { [ATTR_SERVICE_NAME]: this.serviceName }),
+          [PG_SERVER_ADDRESS]: this.serverAddress,
+          [PG_SERVER_PORT]: this.serverPort,
+          [ATTR_DB_SYSTEM_NAME]: DB_SYSTEM_NAME_VALUE_POSTGRESQL,
+          [ATTR_DB_NAMESPACE]: event.databaseName || this.databaseName,
+          [ATTR_DB_QUERY_TEXT]: this.sanitizeQuery(event.sql),
+          [PG_DB_QUERY_TYPE]: this.getQueryType(queryAnalysis.operation),
+          [ATTR_DB_OPERATION_NAME]: queryAnalysis.operation,
+          [ATTR_DB_COLLECTION_NAME]: queryAnalysis.table || "unknown",
           [PG_DB_PARAMETER_COUNT]: event.params.length,
           [PG_DB_QUERY_HAS_WHERE]: queryAnalysis.hasWhere,
           [PG_DB_QUERY_HAS_JOIN]: queryAnalysis.hasJoin,
@@ -272,10 +269,6 @@ export class PostgresInstrumentation extends InstrumentationBase {
           [PG_DB_QUERY_COMPLEXITY]: queryAnalysis.estimatedComplexity,
           [PG_DB_DURATION_MS]: event.durationMs,
           [PG_DB_DURATION_SECONDS]: event.durationMs / 1000,
-          ...(this.serviceName && { [PG_SERVICE_NAME]: this.serviceName }),
-          [PG_DB_QUERY_TYPE]: this.getQueryType(queryAnalysis.operation),
-          [PG_SERVER_ADDRESS]: this.serverAddress,
-          [PG_SERVER_PORT]: this.serverPort,
         },
       },
       context.active(),
@@ -294,12 +287,11 @@ export class PostgresInstrumentation extends InstrumentationBase {
         message: String(event.error),
       });
       span.recordException(event.error as Error);
-      span.setAttribute(PG_ERROR_TYPE, this.getErrorType(event.error));
+      span.setAttribute(ATTR_EXCEPTION_TYPE, this.getErrorType(event.error));
       this.customLogger?.debug?.(`${LOG_PREFIX} Query failed:`, event.error);
     } else {
       span.setStatus({ code: SpanStatusCode.OK });
       if (event.result) {
-        span.setAttribute(PG_DB_RESULT_TYPE, typeof event.result);
         if (Array.isArray(event.result)) {
           span.setAttribute(PG_DB_RESULT_ROW_COUNT, event.result.length);
         }
@@ -325,9 +317,9 @@ export class PostgresInstrumentation extends InstrumentationBase {
 
     if (this.connectionCounter) {
       const attributes = {
-        [PG_METRIC_ATTR_DB_SYSTEM]: DB_SYSTEM_NAME_VALUE_POSTGRESQL,
+        [ATTR_DB_SYSTEM_NAME]: DB_SYSTEM_NAME_VALUE_POSTGRESQL,
         ...(this.serviceName && {
-          [PG_METRIC_ATTR_SERVICE_NAME]: this.serviceName,
+          [ATTR_SERVICE_NAME]: this.serviceName,
         }),
       };
 
@@ -344,9 +336,9 @@ export class PostgresInstrumentation extends InstrumentationBase {
         const durationSeconds = durationMs / 1000;
 
         const attributes = {
-          [PG_METRIC_ATTR_DB_SYSTEM]: DB_SYSTEM_NAME_VALUE_POSTGRESQL,
+          [ATTR_DB_SYSTEM_NAME]: DB_SYSTEM_NAME_VALUE_POSTGRESQL,
           ...(this.serviceName && {
-            [PG_METRIC_ATTR_SERVICE_NAME]: this.serviceName,
+            [ATTR_SERVICE_NAME]: this.serviceName,
           }),
         };
 
@@ -393,15 +385,13 @@ export class PostgresInstrumentation extends InstrumentationBase {
     try {
       const durationInSeconds = event.durationMs / 1000;
       const attributes = {
-        [PG_METRIC_ATTR_DB_SYSTEM]: DB_SYSTEM_NAME_VALUE_POSTGRESQL,
-        [PG_METRIC_ATTR_DB_OPERATION]: queryAnalysis.operation,
-        [PG_METRIC_ATTR_DB_TABLE]: queryAnalysis.table || "unknown",
-        [PG_METRIC_ATTR_DB_QUERY_COMPLEXITY]: queryAnalysis.estimatedComplexity,
-        [PG_METRIC_ATTR_DB_QUERY_TYPE]: this.getQueryType(
-          queryAnalysis.operation,
-        ),
+        [ATTR_DB_SYSTEM_NAME]: DB_SYSTEM_NAME_VALUE_POSTGRESQL,
+        [ATTR_DB_OPERATION_NAME]: queryAnalysis.operation,
+        [ATTR_DB_COLLECTION_NAME]: queryAnalysis.table || "unknown",
+        [PG_DB_QUERY_COMPLEXITY]: queryAnalysis.estimatedComplexity,
+        [PG_DB_QUERY_TYPE]: this.getQueryType(queryAnalysis.operation),
         ...(this.serviceName && {
-          [PG_METRIC_ATTR_SERVICE_NAME]: this.serviceName,
+          [ATTR_SERVICE_NAME]: this.serviceName,
         }),
       };
 
@@ -435,21 +425,21 @@ export class PostgresInstrumentation extends InstrumentationBase {
   private getQueryType(operation: string): string {
     switch (operation.toUpperCase()) {
       case "SELECT":
-        return PG_QUERY_TYPE_READ;
+        return PG_QUERY_TYPE.READ;
       case "INSERT":
-        return PG_QUERY_TYPE_WRITE;
+        return PG_QUERY_TYPE.WRITE;
       case "UPDATE":
-        return PG_QUERY_TYPE_WRITE;
+        return PG_QUERY_TYPE.WRITE;
       case "DELETE":
-        return PG_QUERY_TYPE_WRITE;
+        return PG_QUERY_TYPE.WRITE;
       case "CREATE":
-        return PG_QUERY_TYPE_SCHEMA;
+        return PG_QUERY_TYPE.SCHEMA;
       case "ALTER":
-        return PG_QUERY_TYPE_SCHEMA;
+        return PG_QUERY_TYPE.SCHEMA;
       case "DROP":
-        return PG_QUERY_TYPE_SCHEMA;
+        return PG_QUERY_TYPE.SCHEMA;
       default:
-        return PG_QUERY_TYPE_UNKNOWN;
+        return PG_QUERY_TYPE.UNKNOWN;
     }
   }
 

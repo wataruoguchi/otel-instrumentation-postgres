@@ -26,6 +26,7 @@ function getApp(db: DBClient) {
       price: faker.number.int({ min: 100, max: 1000 }),
     }));
     await db.insertInto("products").values(products).execute();
+    return c.redirect("/products");
   });
   return app;
 }

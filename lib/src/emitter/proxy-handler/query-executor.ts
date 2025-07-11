@@ -14,9 +14,28 @@ export async function emitAndRunQuery(
   const params = (argArray[1] as unknown[]) || [];
   const start = Date.now();
 
+  // Try to extract database name from the client (thisArg or target)
+  let databaseName: string | undefined;
+  if (
+    thisArg &&
+    typeof thisArg === "object" &&
+    "options" in thisArg &&
+    (thisArg as any).options?.database
+  ) {
+    databaseName = (thisArg as any).options.database;
+  } else if (
+    target &&
+    typeof target === "object" &&
+    "options" in target &&
+    (target as any).options?.database
+  ) {
+    databaseName = (target as any).options.database;
+  }
+
   logger?.debug?.(
     `${LOG_PREFIX} Intercepted query:`,
     `${sql.substring(0, 100)}...`,
+    databaseName ? `(database: ${databaseName})` : "",
   );
 
   try {
@@ -29,11 +48,13 @@ export async function emitAndRunQuery(
       params,
       result,
       durationMs: Date.now() - start,
+      databaseName,
     } as DbQueryEvent;
 
     logger?.debug?.(
       `${LOG_PREFIX} Emitting success event:`,
       `${event.durationMs}ms`,
+      databaseName ? `(database: ${databaseName})` : "",
     );
     getDbEventEmitter(logger).emit(PG_EVENT_NAME, event);
     return result;
@@ -43,11 +64,13 @@ export async function emitAndRunQuery(
       params,
       error,
       durationMs: Date.now() - start,
+      databaseName,
     } as DbQueryEvent;
 
     logger?.debug?.(
       `${LOG_PREFIX} Emitting error event:`,
       `${event.durationMs}ms`,
+      databaseName ? `(database: ${databaseName})` : "",
     );
     getDbEventEmitter(logger).emit(PG_EVENT_NAME, event);
     throw error;
