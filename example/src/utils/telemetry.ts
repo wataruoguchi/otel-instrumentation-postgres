@@ -28,6 +28,7 @@ export const createTelemetryInstance = (logger?: Logger) =>
     traceExporter: new ConsoleSpanExporter(),
     metricReader: new PeriodicExportingMetricReader({
       exporter: new ConsoleMetricExporter(),
+      exportIntervalMillis: 20_000, // Export every 20 seconds instead of default 60
     }),
     instrumentations: [
       new PostgresInstrumentation({
