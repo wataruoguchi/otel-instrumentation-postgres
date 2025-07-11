@@ -1,41 +1,28 @@
+import fs from "node:fs";
 import type { Logger } from "otel-instrumentation-postgres";
-import lockfile from "proper-lockfile";
 
-export async function runOnce(
-  lockFileName: string,
+// Use a file-based flag to ensure persistence across all bundle contexts
+const FLAG_FILE = "/tmp/.telemetry-initialized";
+
+export function runOnce(
+  _lockDir: string, // Keep parameter for backward compatibility
   functionRunsOnce: () => void,
   logger?: Logger,
-): Promise<void> {
-  let release: (() => Promise<void>) | null = null;
+): void {
+  // Check file-based flag first
+  if (fs.existsSync(FLAG_FILE)) return;
+
+  logger?.debug?.("[RUN-ONCE] No flag file found, running function");
 
   try {
-    // Try to acquire the lock
-    release = await lockfile.lock(lockFileName, {
-      retries: 0, // Don't retry, just fail if already locked
-      stale: 10000, // 10 second stale lock timeout
-    });
-
-    // Initialize telemetry (pure function)
     functionRunsOnce();
+    // Create flag file to mark initialization
+    fs.writeFileSync(FLAG_FILE, Date.now().toString());
+    logger?.debug?.(
+      `[RUN-ONCE] Function executed successfully and flag file created`,
+    );
   } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "ELOCKED"
-    ) {
-      return;
-    }
-
     logger?.error?.(`Failed to run function: ${error}`);
     throw error;
-  } finally {
-    if (release) {
-      try {
-        await release();
-      } catch (_e) {
-        // Ignore errors when releasing lock
-      }
-    }
   }
 }
