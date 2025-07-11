@@ -1,7 +1,8 @@
 import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getDbEventEmitter } from "./db-events.js";
-import { createOTELEmitter, type PostgresClient } from "./emitter.js";
+import { getDbEventEmitter } from "../db-events.js";
+import { createOTELEmitter } from "./emitter.js";
+import type { PostgresClient } from "./postgres-client.js";
 
 // Mock the db-events module
 vi.mock("./db-events.js", () => ({

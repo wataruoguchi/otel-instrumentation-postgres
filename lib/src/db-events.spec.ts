@@ -1,79 +1,14 @@
 import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createDbEventEmitter,
-  getDbEventEmitter,
-  type Logger,
-} from "./db-events.js";
+import { getDbEventEmitter } from "./db-events.js";
 
 describe("db-events", () => {
-  let mockLogger: Logger;
+  let mockLogger: { debug: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     mockLogger = {
       debug: vi.fn(),
     };
-  });
-
-  describe("createDbEventEmitter", () => {
-    it("should create an EventEmitter instance", () => {
-      const emitter = createDbEventEmitter(mockLogger);
-      expect(emitter).toBeInstanceOf(EventEmitter);
-    });
-
-    it("should log when emitter is created", () => {
-      createDbEventEmitter(mockLogger);
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        "[DB-EVENTS] Event emitter created, instance ID:",
-        0,
-      );
-    });
-
-    it("should log when db:query events are emitted", () => {
-      const emitter = createDbEventEmitter(mockLogger);
-      const testEvent = { sql: "SELECT 1", params: [], durationMs: 10 };
-
-      emitter.emit("db:query", testEvent);
-
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        "[DB-EVENTS] Emitting db:query event with",
-        1,
-        "arguments",
-      );
-    });
-
-    it("should log when listeners are added", () => {
-      const emitter = createDbEventEmitter(mockLogger);
-      const listener = vi.fn();
-
-      emitter.on("db:query", listener);
-
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        "[DB-EVENTS] Adding listener for db:query event",
-      );
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        "[DB-EVENTS] Listener count before:",
-        0,
-      );
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        "[DB-EVENTS] Listener count after:",
-        1,
-      );
-    });
-
-    it("should work without logger", () => {
-      const emitter = createDbEventEmitter();
-      expect(emitter).toBeInstanceOf(EventEmitter);
-
-      // Should not throw when emitting events without logger
-      expect(() => {
-        emitter.emit("db:query", {
-          sql: "SELECT 1",
-          params: [],
-          durationMs: 10,
-        });
-      }).not.toThrow();
-    });
   });
 
   describe("getDbEventEmitter", () => {
@@ -95,9 +30,7 @@ describe("db-events", () => {
       const emitter2 = getDbEventEmitter(mockLogger);
 
       expect(emitter1).toBe(emitter2);
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        "[DB-EVENTS] Using existing event emitter from global scope",
-      );
+      // No debug log on subsequent calls since we removed that logging
     });
 
     it("should work without logger", () => {
@@ -119,9 +52,18 @@ describe("db-events", () => {
       expect(logger1.debug).toHaveBeenCalledWith(
         "[DB-EVENTS] Creating new event emitter singleton",
       );
-      expect(logger2.debug).toHaveBeenCalledWith(
-        "[DB-EVENTS] Using existing event emitter from global scope",
-      );
+      // No debug log on subsequent calls since we removed that logging
+    });
+
+    it("should be able to emit and listen to events", () => {
+      const emitter = getDbEventEmitter(mockLogger);
+      const listener = vi.fn();
+      const testEvent = { sql: "SELECT 1", params: [], durationMs: 10 };
+
+      emitter.on("db:query", listener);
+      emitter.emit("db:query", testEvent);
+
+      expect(listener).toHaveBeenCalledWith(testEvent);
     });
   });
 });
