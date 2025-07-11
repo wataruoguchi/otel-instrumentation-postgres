@@ -5,7 +5,7 @@ import { createOTELEmitter } from "./emitter.js";
 import type { PostgresClient } from "./postgres-client.js";
 
 // Mock the db-events module
-vi.mock("./db-events.js", () => ({
+vi.mock("../db-events.js", () => ({
   getDbEventEmitter: vi.fn(),
 }));
 

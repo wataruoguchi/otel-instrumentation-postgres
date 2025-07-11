@@ -34,7 +34,7 @@ export async function emitAndRunQuery(
 
   logger?.debug?.(
     `${LOG_PREFIX} Intercepted query:`,
-    `${sql.substring(0, 100)}...`,
+    `${String(sql).substring(0, 100)}...`,
     databaseName ? `(database: ${databaseName})` : "",
   );
 

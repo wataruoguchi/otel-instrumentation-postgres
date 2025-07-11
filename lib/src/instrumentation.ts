@@ -194,10 +194,12 @@ export class PostgresInstrumentation extends InstrumentationBase {
 
   override enable(): void {
     super.enable();
+    this.customLogger?.debug?.(`${LOG_PREFIX} Enable method called`);
     this.customLogger?.info?.(
       `${LOG_PREFIX} Enabling postgres instrumentation`,
     );
     this.setupEventListeners();
+    this.customLogger?.debug?.(`${LOG_PREFIX} Enable method completed`);
   }
 
   override disable(): void {
