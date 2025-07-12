@@ -398,6 +398,62 @@
           "unit": "reqps"
         }
       }
+    },
+    {
+      "id": 23,
+      "title": "Total SQL Errors",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 80 },
+      "targets": [
+        {
+          "expr": "sum(db_client_errors_total)",
+          "legendFormat": "Total SQL Errors",
+          "datasource": "Prometheus"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "title": "SQL Error Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 80 },
+      "targets": [
+        {
+          "expr": "rate(db_client_errors_total[5m])",
+          "legendFormat": "SQL Errors per Second",
+          "datasource": "Prometheus"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "reqps"
+        }
+      }
     }
   ],
   "time": {
