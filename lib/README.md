@@ -108,57 +108,50 @@ Each database query generates a span with rich attributes:
 - `net.peer.name`: Database server address
 - `net.peer.port`: Database server port
 - `exception.type`: Error type for failed queries
-- `service.name`: Service name (when configured)
 
 #### Custom Attributes
 
-- `db.parameter_count`: Number of query parameters
-- `db.duration_ms`: Query duration in milliseconds
-- `db.duration_seconds`: Query duration in seconds
-- `db.query.has_where`: Whether query has WHERE clause
-- `db.query.has_join`: Whether query has JOIN clauses
-- `db.query.has_order_by`: Whether query has ORDER BY
-- `db.query.has_limit`: Whether query has LIMIT
-- `db.query.complexity`: Estimated complexity (low/medium/high)
-- `db.query.type`: Query type (read/write/schema/unknown)
-- `db.result.row_count`: Number of rows returned (for arrays)
-
-#### Query Parameters (when enabled)
-
-- `db.query.parameter.0`, `db.query.parameter.1`, etc.: Individual query parameters (sanitized)
+- `otel.instrumentation.postgres.query.duration_ms`: Query duration in milliseconds
+- `otel.instrumentation.postgres.query.duration_seconds`: Query duration in seconds
+- `otel.instrumentation.postgres.query.parameter_count`: Number of query parameters
+- `otel.instrumentation.postgres.query.has_where`: Whether query has WHERE clause
+- `otel.instrumentation.postgres.query.has_join`: Whether query has JOIN clause
+- `otel.instrumentation.postgres.query.has_order_by`: Whether query has ORDER BY clause
+- `otel.instrumentation.postgres.query.has_limit`: Whether query has LIMIT clause
+- `otel.instrumentation.postgres.query.complexity`: Estimated query complexity (low/medium/high)
+- `otel.instrumentation.postgres.query.type`: Query type (read/write)
 
 ### Metrics
 
-#### Query Duration Histogram
-
-- **Name**: `db.client.requests.duration` (from semantic conventions)
-- **Unit**: Seconds
-- **Description**: Distribution of query execution times
-- **Attributes**: `db_system`, `db_operation`, `db_collection_name`, `db_query_complexity`, `db_query_type`, `service_name`
-
-#### Query Counter
-
-- **Name**: `db.client.requests`
-- **Description**: Total number of database queries
-- **Attributes**: `db_system`, `db_operation`, `db_collection_name`, `db_query_complexity`, `db_query_type`, `service_name`
-
-#### Error Counter
-
-- **Name**: `db.client.errors`
-- **Description**: Number of database query errors
-- **Attributes**: `db_system`, `db_operation`, `db_collection_name`, `db_error_type`, `service_name`
-
-#### Connection Metrics
-
-- **Name**: `db.client.connections`
-- **Description**: Number of database connections established
-- **Attributes**: `db_system`, `service_name`
-
-- **Name**: `db.client.connections.duration`
-- **Description**: Duration of database connections
-- **Attributes**: `db_system`, `service_name`
+- `db.client.operations.duration`: Histogram of query durations
+- `otel.instrumentation.postgres.requests`: Counter of total queries
+- `otel.instrumentation.postgres.errors`: Counter of failed queries
+- `otel.instrumentation.postgres.connections`: Counter of database connections
+- `otel.instrumentation.postgres.connection.duration`: Histogram of connection durations
 
 ## Advanced Usage
+
+### Custom Parameter Sanitization
+
+```typescript
+const instrumentation = new PostgresInstrumentation({
+  parameterSanitizer: (param, index) => {
+    // Redact sensitive data
+    if (typeof param === "string") {
+      if (param.match(/^\d{4}-\d{4}-\d{4}-\d{4}$/)) {
+        return "****-****-****-" + param.slice(-4); // Credit card
+      }
+      if (param.includes("@")) {
+        return "[EMAIL]"; // Email addresses
+      }
+    }
+    
+    // Truncate long values
+    const str = String(param);
+    return str.length > 50 ? str.substring(0, 50) + "..." : str;
+  },
+});
+```
 
 ### Custom Hooks
 
@@ -189,28 +182,6 @@ const instrumentation = new PostgresInstrumentation({
         span.setAttribute("db.result.empty", true);
       }
     }
-  },
-});
-```
-
-### Custom Parameter Sanitization
-
-```typescript
-const instrumentation = new PostgresInstrumentation({
-  parameterSanitizer: (param, index) => {
-    // Redact sensitive data
-    if (typeof param === "string") {
-      if (param.match(/^\d{4}-\d{4}-\d{4}-\d{4}$/)) {
-        return "****-****-****-" + param.slice(-4); // Credit card
-      }
-      if (param.includes("@")) {
-        return "[EMAIL]"; // Email addresses
-      }
-    }
-    
-    // Truncate long values
-    const str = String(param);
-    return str.length > 50 ? str.substring(0, 50) + "..." : str;
   },
 });
 ```
@@ -246,3 +217,92 @@ await instrumentedSql`
   VALUES (${name}, ${email})
 `;
 ```
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+
+- npm
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/wataruoguchi/otel-instrumentation-postgres.git
+cd otel-instrumentation-postgres
+
+# Install dependencies
+cd lib && npm install
+cd ../example && npm install
+
+# Run tests
+cd ../lib && npm test
+
+# Build the package
+npm run build
+```
+
+### Project Structure
+
+```
+otel-instrumentation-postgres/
+├── lib/                    # Main library
+│   ├── src/               # Source code
+│   ├── package.json       # Library package.json
+│   └── README.md          # Library documentation
+├── example/               # Example application
+│   ├── src/              # Example source code
+│   ├── docker-compose.yml # Example infrastructure
+│   └── package.json      # Example package.json
+└── README.md             # This file
+```
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+### Workflows
+
+- **CI** (`ci.yml`): Runs tests and linting on every push/PR (excludes example directory)
+- **Release** (`release.yml`): Complete release pipeline - tests, builds, publishes to npm, and creates GitHub releases on version tags
+
+### Important Notes
+
+- **Example directory changes do NOT trigger pipelines** - The example is for demonstration only
+- **Only changes to the main library code** will trigger CI workflows
+- **Version tags trigger the complete release process** regardless of what files changed
+
+### Release Process
+
+1. **Create a version tag**: `git tag v1.0.0`
+2. **Push the tag**: `git push origin v1.0.0`
+3. **Automated release**: The workflow will:
+   - Run all tests
+   - Build the package
+   - Publish to npm
+   - Create a GitHub release
+
+### Required Secrets
+
+- `NPM_TOKEN`: Your npm authentication token for publishing
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes
+4. Run tests: `npm test`
+5. Commit your changes: `git commit -m 'Add amazing feature'`
+6. Push to the branch: `git push origin feature/amazing-feature`
+7. Open a Pull Request
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Postgres.js](https://github.com/porsager/postgres) - The excellent PostgreSQL client
+- [OpenTelemetry](https://opentelemetry.io/) - The observability framework
+- [Kysely](https://github.com/kysely-org/kysely) - Type-safe SQL query builder used in examples

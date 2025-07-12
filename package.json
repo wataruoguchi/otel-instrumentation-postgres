@@ -1,12 +1,20 @@
 {
-  "name": "postgres-instrumentation-workspace",
+  "name": "otel-instrumentation-postgres-monorepo",
+  "version": "1.0.0",
+  "description": "OpenTelemetry instrumentation for postgres.js - Monorepo",
   "private": true,
   "scripts": {
-    "format": "biome format --write --no-errors-on-unmatched"
+    "test": "cd lib && npm test",
+    "build": "cd lib && npm run build",
+    "lint": "cd lib && npx biome check .",
+    "format": "cd lib && npx biome format --write .",
+    "release:patch": "./scripts/release.sh patch",
+    "release:minor": "./scripts/release.sh minor",
+    "release:major": "./scripts/release.sh major"
   },
   "workspaces": [
-    "lib/*",
-    "example/*"
+    "lib",
+    "example"
   ],
   "devDependencies": {
     "@biomejs/biome": "^2.1.1"
