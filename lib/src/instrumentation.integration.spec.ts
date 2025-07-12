@@ -2,12 +2,42 @@ import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDbEventEmitter } from "./db-events.js";
 import { createOTELEmitter } from "./emitter/emitter.js";
+import type { PostgresClient } from "./emitter/postgres-client.js";
 import { PostgresInstrumentation } from "./instrumentation.js";
 
 // Mock the db-events module
 vi.mock("./db-events.js", () => ({
   getDbEventEmitter: vi.fn(),
 }));
+
+// Test helper types for the EventEmitting client
+type EventEmittingClient = PostgresClient & {
+  query: (...args: unknown[]) => Promise<unknown>;
+  reserve?: () => Promise<EventEmittingReservedConnection>;
+  end?: () => Promise<unknown>;
+  close?: () => Promise<unknown>;
+};
+
+// Test helper type for reserved connections
+type EventEmittingReservedConnection = {
+  query: (...args: unknown[]) => Promise<unknown>;
+  release: () => Promise<unknown>;
+};
+
+// Test helper function to create properly typed EventEmitting client
+function createTestEventEmittingClient(
+  mockClient: Record<string, unknown>,
+  logger?: {
+    debug: ReturnType<typeof vi.fn>;
+    info: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+  },
+): EventEmittingClient {
+  return createOTELEmitter(
+    mockClient as unknown as PostgresClient,
+    logger,
+  ) as EventEmittingClient;
+}
 
 describe("instrumentation integration", () => {
   let mockDbEventEmitter: EventEmitter;
@@ -45,7 +75,7 @@ describe("instrumentation integration", () => {
       };
 
       // Create the event-emitting client
-      const eventEmittingClient = createOTELEmitter(
+      const eventEmittingClient = createTestEventEmittingClient(
         mockPostgresClient,
         mockLogger,
       );
@@ -81,7 +111,7 @@ describe("instrumentation integration", () => {
         options: { database: "testdb" },
       };
 
-      const eventEmittingClient = createOTELEmitter(
+      const eventEmittingClient = createTestEventEmittingClient(
         mockPostgresClient,
         mockLogger,
       );
@@ -109,7 +139,7 @@ describe("instrumentation integration", () => {
         options: { database: "testdb" },
       };
 
-      const eventEmittingClient = createOTELEmitter(
+      const eventEmittingClient = createTestEventEmittingClient(
         mockPostgresClient,
         mockLogger,
       );
@@ -119,13 +149,12 @@ describe("instrumentation integration", () => {
       const reserved = await eventEmittingClient.reserve();
 
       // Execute a query on the reserved connection
-      const result = await reserved.query(
-        "SELECT * FROM users WHERE id = ?",
-        [1],
-      );
+      const result = await (
+        reserved as unknown as EventEmittingReservedConnection
+      ).query("SELECT * FROM users WHERE id = ?", [1]);
 
       // Release the connection
-      await reserved.release();
+      await (reserved as unknown as EventEmittingReservedConnection).release();
 
       expect(mockPostgresClient.reserve).toHaveBeenCalled();
       expect(mockReservedConnection.query).toHaveBeenCalledWith(
@@ -146,7 +175,7 @@ describe("instrumentation integration", () => {
         options: { database: "testdb" },
       };
 
-      const eventEmittingClient = createOTELEmitter(
+      const eventEmittingClient = createTestEventEmittingClient(
         mockPostgresClient,
         mockLogger,
       );
@@ -178,7 +207,7 @@ describe("instrumentation integration", () => {
         options: { database: "testdb" },
       };
 
-      const eventEmittingClient = createOTELEmitter(
+      const eventEmittingClient = createTestEventEmittingClient(
         mockPostgresClient,
         mockLogger,
       );
@@ -204,7 +233,7 @@ describe("instrumentation integration", () => {
         options: { database: "testdb" },
       };
 
-      const eventEmittingClient = createOTELEmitter(
+      const eventEmittingClient = createTestEventEmittingClient(
         mockPostgresClient,
         mockLogger,
       );
@@ -226,7 +255,7 @@ describe("instrumentation integration", () => {
         options: { database: "testdb" },
       };
 
-      const eventEmittingClient = createOTELEmitter(
+      const eventEmittingClient = createTestEventEmittingClient(
         mockPostgresClient,
         mockLogger,
       );
@@ -268,11 +297,11 @@ describe("instrumentation integration", () => {
         options: { database: "db2" },
       };
 
-      const eventEmittingClient1 = createOTELEmitter(
+      const eventEmittingClient1 = createTestEventEmittingClient(
         mockPostgresClient1,
         mockLogger,
       );
-      const eventEmittingClient2 = createOTELEmitter(
+      const eventEmittingClient2 = createTestEventEmittingClient(
         mockPostgresClient2,
         mockLogger,
       );
@@ -296,7 +325,7 @@ describe("instrumentation integration", () => {
         options: { database: "testdb" },
       };
 
-      const eventEmittingClient = createOTELEmitter(
+      const eventEmittingClient = createTestEventEmittingClient(
         mockPostgresClient,
         mockLogger,
       );
@@ -330,7 +359,7 @@ describe("instrumentation integration", () => {
         options: { database: "testdb" },
       };
 
-      const eventEmittingClient = createOTELEmitter(
+      const eventEmittingClient = createTestEventEmittingClient(
         mockPostgresClient,
         mockLogger,
       );
