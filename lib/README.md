@@ -111,23 +111,28 @@ Each database query generates a span with rich attributes:
 
 #### Custom Attributes
 
-- `otel.instrumentation.postgres.query.duration_ms`: Query duration in milliseconds
-- `otel.instrumentation.postgres.query.duration_seconds`: Query duration in seconds
-- `otel.instrumentation.postgres.query.parameter_count`: Number of query parameters
-- `otel.instrumentation.postgres.query.has_where`: Whether query has WHERE clause
-- `otel.instrumentation.postgres.query.has_join`: Whether query has JOIN clause
-- `otel.instrumentation.postgres.query.has_order_by`: Whether query has ORDER BY clause
-- `otel.instrumentation.postgres.query.has_limit`: Whether query has LIMIT clause
-- `otel.instrumentation.postgres.query.complexity`: Estimated query complexity (low/medium/high)
-- `otel.instrumentation.postgres.query.type`: Query type (read/write)
+- `db.parameter_count`: Number of query parameters
+- `db.duration_ms`: Query duration in milliseconds
+- `db.duration_seconds`: Query duration in seconds
+- `db.query.has_where`: Whether query has WHERE clause
+- `db.query.has_join`: Whether query has JOIN clause
+- `db.query.has_order_by`: Whether query has ORDER BY clause
+- `db.query.has_limit`: Whether query has LIMIT clause
+- `db.query.complexity`: Estimated query complexity (low/medium/high)
+- `db.query.type`: Query type (read/write/schema/unknown)
+- `db.result.row_count`: Number of rows returned (for arrays)
+
+#### Query Parameters (when enabled)
+
+- `db.query.parameter.0`, `db.query.parameter.1`, etc.: Individual query parameters (sanitized)
 
 ### Metrics
 
 - `db.client.operations.duration`: Histogram of query durations
-- `otel.instrumentation.postgres.requests`: Counter of total queries
-- `otel.instrumentation.postgres.errors`: Counter of failed queries
-- `otel.instrumentation.postgres.connections`: Counter of database connections
-- `otel.instrumentation.postgres.connection.duration`: Histogram of connection durations
+- `db.client.requests`: Counter of total queries
+- `db.client.errors`: Counter of failed queries
+- `db.client.connections`: Counter of database connections
+- `db.client.connections.duration`: Histogram of connection durations
 
 ## Advanced Usage
 
