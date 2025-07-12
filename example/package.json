@@ -10,6 +10,8 @@
   "dependencies": {
     "@faker-js/faker": "^9.9.0",
     "@hono/node-server": "^1.15.0",
+    "@opentelemetry/exporter-prometheus": "^0.202.0",
+    "@opentelemetry/exporter-zipkin": "^1.0.0",
     "@opentelemetry/instrumentation": "^0.202.0",
     "@opentelemetry/instrumentation-http": "^0.202.0",
     "@opentelemetry/resources": "^2.0.1",

@@ -7,6 +7,7 @@ const envSchema = z.object({
   PGUSER: z.string(),
   PGPASSWORD: z.string(),
   PORT: z.coerce.number(),
+  PROMETHEUS_PORT: z.coerce.number().optional(),
 });
 
 export const getEnv = () => envSchema.parse(process.env);

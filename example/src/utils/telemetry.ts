@@ -1,3 +1,5 @@
+import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
+import { ZipkinExporter } from "@opentelemetry/exporter-zipkin";
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import {
@@ -22,14 +24,30 @@ const resource = resourceFromAttributes({
   [ATTR_SERVICE_VERSION]: "1.0.0",
 });
 
+// Create PrometheusExporter as a MetricReader
+const prometheusExporter = new PrometheusExporter({
+  port: Number(process.env.PROMETHEUS_PORT),
+  endpoint: "/metrics",
+});
+
+// Check if we're in debug mode (console export) or production mode (Zipkin export)
+const isDebug =
+  process.env.NODE_ENV === "development" &&
+  process.env.DEBUG_TELEMETRY === "true";
+
 export const createTelemetryInstance = (logger?: Logger) =>
   new NodeSDK({
     resource,
-    traceExporter: new ConsoleSpanExporter(),
-    metricReader: new PeriodicExportingMetricReader({
-      exporter: new ConsoleMetricExporter(),
-      exportIntervalMillis: 20_000, // Export every 20 seconds instead of default 60
-    }),
+    traceExporter: isDebug
+      ? new ConsoleSpanExporter()
+      : (new ZipkinExporter({
+          url: process.env.ZIPKIN_URL,
+        }) as any), // Type assertion to bypass version compatibility issues
+    metricReader: isDebug
+      ? new PeriodicExportingMetricReader({
+          exporter: new ConsoleMetricExporter(),
+        })
+      : prometheusExporter,
     instrumentations: [
       new PostgresInstrumentation({
         serviceName,

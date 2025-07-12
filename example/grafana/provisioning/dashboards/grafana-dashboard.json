@@ -1,0 +1,104 @@
+{
+  "id": null,
+  "title": "PostgreSQL Instrumentation Metrics",
+  "tags": ["postgresql", "opentelemetry"],
+  "style": "dark",
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Database Query Duration",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(db_client_operation_duration_sum[5m]) / rate(db_client_operation_duration_count[5m])",
+          "legendFormat": "{{db_operation_name}} - {{db_collection_name}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Duration (seconds)",
+          "unit": "s"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Database Query Count",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(db_client_requests_total[5m])",
+          "legendFormat": "{{db_operation_name}} - {{db_collection_name}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Queries per second",
+          "unit": "reqps"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Database Connections",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(db_client_connections_total[5m])",
+          "legendFormat": "Connections per second",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Connections per second",
+          "unit": "connps"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Database Query Complexity Distribution",
+      "type": "piechart",
+      "targets": [
+        {
+          "expr": "sum(db_client_requests_total) by (db_query_complexity)",
+          "legendFormat": "{{db_query_complexity}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Database Query Types",
+      "type": "piechart",
+      "targets": [
+        {
+          "expr": "sum(db_client_requests_total) by (db_query_type)",
+          "legendFormat": "{{db_query_type}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Database Operations",
+      "type": "piechart",
+      "targets": [
+        {
+          "expr": "sum(db_client_requests_total) by (db_operation_name)",
+          "legendFormat": "{{db_operation_name}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "5s"
+}
