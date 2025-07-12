@@ -1,14 +1,98 @@
 {
   "id": null,
   "title": "PostgreSQL Instrumentation Metrics",
-  "tags": ["postgresql", "opentelemetry"],
+  "tags": ["postgresql", "opentelemetry", "http", "monitoring", "traces"],
   "style": "dark",
   "timezone": "browser",
   "panels": [
     {
       "id": 1,
+      "title": "HTTP Request Duration",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(http_server_duration_sum[5m]) / rate(http_server_duration_count[5m])",
+          "legendFormat": "{{http_method}} {{http_status_code}} - {{net_host_name}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Duration (ms)",
+          "unit": "ms"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "HTTP Request Rate",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(http_server_duration_count[5m])",
+          "legendFormat": "{{http_method}} {{http_status_code}} - {{net_host_name}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Requests per second",
+          "unit": "reqps"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "HTTP Status Code Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_duration_count[5m])) by (http_status_code)",
+          "legendFormat": "{{http_status_code}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "HTTP Error Rate",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(http_server_duration_count{http_status_code=~\"4..|5..\"}[5m])",
+          "legendFormat": "{{http_method}} {{http_status_code}} - {{net_host_name}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Errors per second",
+          "unit": "reqps"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "HTTP Method Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_duration_count[5m])) by (http_method)",
+          "legendFormat": "{{http_method}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "id": 6,
       "title": "Database Query Duration",
       "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "targets": [
         {
           "expr": "rate(db_client_operation_duration_sum[5m]) / rate(db_client_operation_duration_count[5m])",
@@ -24,9 +108,10 @@
       ]
     },
     {
-      "id": 2,
+      "id": 7,
       "title": "Database Query Count",
       "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "targets": [
         {
           "expr": "rate(db_client_requests_total[5m])",
@@ -42,9 +127,10 @@
       ]
     },
     {
-      "id": 3,
+      "id": 8,
       "title": "Database Connections",
       "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "targets": [
         {
           "expr": "rate(db_client_connections_total[5m])",
@@ -60,9 +146,29 @@
       ]
     },
     {
-      "id": 4,
+      "id": 9,
+      "title": "Database Connection Duration",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(db_client_connections_duration_sum[5m]) / rate(db_client_connections_duration_count[5m])",
+          "legendFormat": "Connection duration",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Duration (seconds)",
+          "unit": "s"
+        }
+      ]
+    },
+    {
+      "id": 10,
       "title": "Database Query Complexity Distribution",
       "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
       "targets": [
         {
           "expr": "sum(db_client_requests_total) by (db_query_complexity)",
@@ -72,9 +178,10 @@
       ]
     },
     {
-      "id": 5,
+      "id": 11,
       "title": "Database Query Types",
       "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 32 },
       "targets": [
         {
           "expr": "sum(db_client_requests_total) by (db_query_type)",
@@ -84,9 +191,10 @@
       ]
     },
     {
-      "id": 6,
+      "id": 12,
       "title": "Database Operations",
       "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 32 },
       "targets": [
         {
           "expr": "sum(db_client_requests_total) by (db_operation_name)",
@@ -94,11 +202,213 @@
           "datasource": "Prometheus"
         }
       ]
+    },
+    {
+      "id": 13,
+      "title": "Application Health - Target Info",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "expr": "target_info",
+          "legendFormat": "{{service_name}} v{{service_version}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [{ "color": "green", "value": 1 }]
+          }
+        }
+      }
+    },
+    {
+      "id": 14,
+      "title": "HTTP Client Duration (Outbound)",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+      "targets": [
+        {
+          "expr": "rate(http_client_duration_sum[5m]) / rate(http_client_duration_count[5m])",
+          "legendFormat": "{{http_method}} {{net_peer_name}}:{{net_peer_port}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Duration (ms)",
+          "unit": "ms"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "title": "HTTP Client Request Rate (Outbound)",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+      "targets": [
+        {
+          "expr": "rate(http_client_duration_count[5m])",
+          "legendFormat": "{{http_method}} {{net_peer_name}}:{{net_peer_port}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Requests per second",
+          "unit": "reqps"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "Trace Span Count (from Metrics)",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
+      "targets": [
+        {
+          "expr": "rate(http_server_duration_count[5m]) + rate(db_client_requests_total[5m])",
+          "legendFormat": "Total spans per second",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Spans per second",
+          "unit": "spansps"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "Trace Duration Breakdown",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+      "targets": [
+        {
+          "expr": "rate(http_server_duration_sum[5m]) / rate(http_server_duration_count[5m])",
+          "legendFormat": "HTTP Server - {{http_method}}",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "rate(db_client_operation_duration_sum[5m]) / rate(db_client_operation_duration_count[5m]) * 1000",
+          "legendFormat": "Database - {{db_operation_name}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Duration (ms)",
+          "unit": "ms"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "Zipkin Integration Status",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 60 },
+      "targets": [
+        {
+          "expr": "up{job=\"postgres-instrumentation-app\"}",
+          "legendFormat": "App Metrics Collection",
+          "datasource": "Prometheus"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "custom": {
+            "displayMode": "color-background"
+          }
+        }
+      }
+    },
+    {
+      "id": 19,
+      "title": "Trace Error Rate",
+      "type": "graph",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 },
+      "targets": [
+        {
+          "expr": "rate(http_server_duration_count{http_status_code=~\"4..|5..\"}[5m]) / rate(http_server_duration_count[5m]) * 100",
+          "legendFormat": "HTTP Error % - {{http_method}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "yAxes": [
+        {
+          "label": "Error Rate (%)",
+          "unit": "percent"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "title": "Zipkin Trace Info",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 },
+      "content": "## 🔍 **Zipkin Trace Access**\n\n**To view detailed traces:**\n\n1. Click **Explore** (compass icon) in Grafana\n2. Select **Zipkin** data source\n3. Search traces by:\n   - Service name: `my-example-app`\n   - Operation: `GET /`\n   - Time range\n\n**Trace Data Available:**\n- HTTP request spans\n- Database query spans\n- External service calls\n- Error tracking\n- Performance breakdown\n\n**Metrics above show trace-derived data from Prometheus**",
+      "mode": "markdown"
+    },
+    {
+      "id": 21,
+      "title": "HTTP Error Stats by Host and Status Code",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 72 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_duration_count{http_status_code=~\"4..|5..\"}[5m])) by (net_host_name, http_status_code)",
+          "legendFormat": "{{net_host_name}} - {{http_status_code}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "title": "DB Query Stats by Operation and Type",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 72 },
+      "targets": [
+        {
+          "expr": "sum(rate(db_client_requests_total[5m])) by (db_operation_name, db_query_type)",
+          "legendFormat": "{{db_operation_name}} - {{db_query_type}}",
+          "datasource": "Prometheus"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
     }
   ],
   "time": {
     "from": "now-1h",
     "to": "now"
   },
-  "refresh": "5s"
+  "refresh": "5s",
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
 }
