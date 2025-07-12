@@ -3,5 +3,5 @@ export type DB = {
     id: string;
     name: string;
     price: number;
-  }[];
+  };
 };
