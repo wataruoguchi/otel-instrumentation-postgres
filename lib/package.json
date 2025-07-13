@@ -1,6 +1,6 @@
 {
   "name": "otel-instrumentation-postgres",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "OpenTelemetry instrumentation for postgres.js",
   "keywords": [
     "postgresql",
