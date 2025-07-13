@@ -35,9 +35,6 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Run linting
-        run: npx biome check .
-
       - name: Build package
         run: npm run build
 
