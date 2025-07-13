@@ -43,6 +43,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: quality
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     defaults:
       run:
         working-directory: ./lib
