@@ -29,14 +29,14 @@ This guide will help you set up automated testing, building, and publishing for 
 
 The following workflows are configured:
 
-### `ci.yml` - Continuous Integration
+### `quality.yml` - Quality Assurance
 - **Triggers**: Push to main, pull requests (excludes example directory)
 - **Actions**: Runs tests, linting, and builds
 - **Purpose**: Ensures code quality on every change
 
 ### `release.yml` - Release Pipeline
 - **Triggers**: Version tags (e.g., `v1.0.0`) (excludes example directory)
-- **Actions**: Tests, builds, publishes to npm, creates GitHub release
+- **Actions**: Quality checks, builds, publishes to npm, creates GitHub release
 - **Purpose**: Complete release automation
 
 ### Important Notes

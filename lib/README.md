@@ -269,8 +269,8 @@ This project uses GitHub Actions for continuous integration and deployment:
 
 ### Workflows
 
-- **CI** (`ci.yml`): Runs tests and linting on every push/PR (excludes example directory)
-- **Release** (`release.yml`): Complete release pipeline - tests, builds, publishes to npm, and creates GitHub releases on version tags
+- **Quality Assurance** (`quality.yml`): Runs tests, linting, and builds on every push/PR (excludes example directory)
+- **Release** (`release.yml`): Complete release pipeline - quality checks, builds, publishes to npm, and creates GitHub releases on version tags
 
 ### Important Notes
 
