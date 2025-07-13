@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: Those any are unknown. It's ok to leave it as is for internal module. */
 import { PG_EVENT_NAME } from "../../constants.js";
 import { type DbQueryEvent, getDbEventEmitter } from "../../db-events.js";
 import type { Logger } from "../../logger.js";

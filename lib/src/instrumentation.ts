@@ -1,4 +1,12 @@
-import { context, SpanStatusCode, trace, ValueType } from "@opentelemetry/api";
+import {
+  context,
+  type Counter,
+  type Histogram,
+  type Span,
+  SpanStatusCode,
+  trace,
+  ValueType,
+} from "@opentelemetry/api";
 import {
   InstrumentationBase,
   type InstrumentationConfig,
@@ -47,10 +55,10 @@ import { analyzeQuery } from "./query-analysis.js";
 
 const LOG_PREFIX = "[POSTGRES-INSTRUMENTATION]";
 
-type ParameterSanitizer = (param: unknown, index: number) => string;
-type BeforeSpanHook = (span: any, event: DbQueryEvent) => void;
-type AfterSpanHook = (span: any, event: DbQueryEvent) => void;
-type ResponseHook = (span: any, result: unknown) => void;
+type ParameterSanitizer = (param: unknown) => string;
+type BeforeSpanHook = (span: Span, event: DbQueryEvent) => void;
+type AfterSpanHook = (span: Span, event: DbQueryEvent) => void;
+type ResponseHook = (span: Span, result: unknown) => void;
 
 export interface PostgresInstrumentationConfig extends InstrumentationConfig {
   serviceName?: string;
@@ -81,11 +89,11 @@ export class PostgresInstrumentation extends InstrumentationBase {
   private beforeSpan?: BeforeSpanHook;
   private afterSpan?: AfterSpanHook;
   private responseHook?: ResponseHook;
-  private queryDurationHistogram: any;
-  private queryCounter: any;
-  private errorCounter: any;
-  private connectionCounter: any;
-  private connectionDurationHistogram: any;
+  private queryDurationHistogram: Histogram | undefined;
+  private queryCounter: Counter | undefined;
+  private errorCounter: Counter | undefined;
+  private connectionCounter: Counter | undefined;
+  private connectionDurationHistogram: Histogram | undefined;
   private connectionStartTimes: Map<string, number> = new Map();
 
   constructor(config: PostgresInstrumentationConfig = {}) {
@@ -218,10 +226,7 @@ export class PostgresInstrumentation extends InstrumentationBase {
     this.listener = (event: DbQueryEvent) => {
       this.handleQueryEvent(event);
     };
-    getDbEventEmitter(this.customLogger).on(
-      PG_EVENT_NAME,
-      this.listener as any,
-    );
+    getDbEventEmitter(this.customLogger).on(PG_EVENT_NAME, this.listener);
 
     // Add connection event listener
     getDbEventEmitter(this.customLogger).on(
@@ -234,10 +239,7 @@ export class PostgresInstrumentation extends InstrumentationBase {
 
   private removeEventListeners(): void {
     if (this.listener) {
-      getDbEventEmitter(this.customLogger).off(
-        PG_EVENT_NAME,
-        this.listener as any,
-      );
+      getDbEventEmitter(this.customLogger).off(PG_EVENT_NAME, this.listener);
       this.listener = undefined;
     }
   }
@@ -354,17 +356,17 @@ export class PostgresInstrumentation extends InstrumentationBase {
     return sql.replace(/password\s*=\s*['"][^'"]*['"]/gi, "password=***");
   }
 
-  private addQueryParameters(span: any, params: unknown[]): void {
+  private addQueryParameters(span: Span, params: unknown[]): void {
     params.forEach((param, index) => {
       const paramKey = `${PG_DB_QUERY_PARAMETER_PREFIX}${index}`;
-      const paramValue = this.parameterSanitizer(param, index);
+      const paramValue = this.parameterSanitizer(param);
       span.setAttribute(paramKey, paramValue);
     });
   }
 
-  private defaultParameterSanitizer(param: unknown, index: number): string {
+  private defaultParameterSanitizer(param: unknown): string {
     if (typeof param === "string" && param.length > 100) {
-      return param.substring(0, 100) + "...";
+      return `${param.substring(0, 100)}...`;
     }
     // Redact common sensitive fields
     if (typeof param === "string" && /password|token|secret/i.test(param)) {
