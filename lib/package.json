@@ -1,6 +1,6 @@
 {
   "name": "otel-instrumentation-postgres",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "OpenTelemetry instrumentation for postgres.js",
   "keywords": [
     "postgresql",
@@ -26,7 +26,9 @@
   "scripts": {
     "test": "vitest run",
     "build": "tsup",
-    "prepare": "husky"
+    "prepare": "husky",
+    "release": "semantic-release",
+    "release:dry-run": "semantic-release --dry-run"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.1.1",
@@ -35,6 +37,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
     "postgres": "^3.4.7",
+    "semantic-release": "^24.2.7",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"

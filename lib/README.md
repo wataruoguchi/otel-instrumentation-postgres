@@ -248,60 +248,6 @@ cd ../lib && npm test
 npm run build
 ```
 
-### Project Structure
-
-```
-otel-instrumentation-postgres/
-├── lib/                    # Main library
-│   ├── src/               # Source code
-│   ├── package.json       # Library package.json
-│   └── README.md          # Library documentation
-├── example/               # Example application
-│   ├── src/              # Example source code
-│   ├── docker-compose.yml # Example infrastructure
-│   └── package.json      # Example package.json
-└── README.md             # This file
-```
-
-## CI/CD
-
-This project uses GitHub Actions for continuous integration and deployment:
-
-### Workflows
-
-- **Quality Assurance** (`quality.yml`): Runs tests, linting, and builds on every push/PR (excludes example directory)
-- **Release** (`release.yml`): Complete release pipeline - quality checks, builds, publishes to npm, and creates GitHub releases on version tags
-
-### Important Notes
-
-- **Example directory changes do NOT trigger pipelines** - The example is for demonstration only
-- **Only changes to the main library code** will trigger CI workflows
-- **Version tags trigger the complete release process** regardless of what files changed
-
-### Release Process
-
-1. **Create a version tag**: `git tag v1.0.0`
-2. **Push the tag**: `git push origin v1.0.0`
-3. **Automated release**: The workflow will:
-   - Run all tests
-   - Build the package
-   - Publish to npm
-   - Create a GitHub release
-
-### Required Secrets
-
-- `NPM_TOKEN`: Your npm authentication token for publishing
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Run tests: `npm test`
-5. Commit your changes: `git commit -m 'Add amazing feature'`
-6. Push to the branch: `git push origin feature/amazing-feature`
-7. Open a Pull Request
-
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
@@ -310,4 +256,3 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 - [Postgres.js](https://github.com/porsager/postgres) - The excellent PostgreSQL client
 - [OpenTelemetry](https://opentelemetry.io/) - The observability framework
-- [Kysely](https://github.com/kysely-org/kysely) - Type-safe SQL query builder used in examples
