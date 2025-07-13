@@ -1,6 +1,9 @@
 {
   "name": "otel-instrumentation-postgres-monorepo",
+  "author": "Wataru Oguchi <wataru.oguchi.0to1@gmail.com>",
   "description": "OpenTelemetry instrumentation for postgres.js - Monorepo",
+  "repository": "https://github.com/wataruoguchi/otel-instrumentation-postgres",
+  "license": "Apache-2.0",
   "private": true,
   "scripts": {
     "test": "cd lib && npm test",
